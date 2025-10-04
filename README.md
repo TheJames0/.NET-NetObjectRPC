@@ -1,6 +1,4 @@
-# Unity-Style Netcode Library
-
-A WIP lightweight networking library for C# that provides a simple network object registry and simple RPC functionality. 
+A WIP lightweight networking library with similar syntax to Unity's NGO for C# .NET that provides a simple network object registry and simple RPC functionality.
 
 ## Dependencies
 
@@ -77,5 +75,3 @@ public virtual void SendChatServerRpc(string message) { }
 - Implement comprehensive unit and integration tests
 - Add network performance monitoring and statistics tools
 - Explore additional features for future releases
-
-## TODO
