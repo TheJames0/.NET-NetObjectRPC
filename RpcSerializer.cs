@@ -39,16 +39,16 @@ namespace RogueLike.Netcode
             }
         }
 
+        /// <summary>
+        /// Serialize an RPC call to bytes
+        /// </summary>
         public static byte[] SerializeRpcCall(string methodName, uint networkObjectId, object[] parameters)
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
 
-            // Write method name
             writer.Write(methodName);
-            // Write network object ID
             writer.Write(networkObjectId);
-            // Write parameter count
             writer.Write(parameters?.Length ?? 0);
 
             if (parameters != null)
@@ -62,6 +62,9 @@ namespace RogueLike.Netcode
             return stream.ToArray();
         }
 
+        /// <summary>
+        /// Deserialize bytes back to an RPC call
+        /// </summary>
         public static (string methodName, uint networkObjectId, object[] parameters) DeserializeRpcCall(byte[] data)
         {
             using var stream = new MemoryStream(data);
@@ -80,11 +83,14 @@ namespace RogueLike.Netcode
             return (methodName, networkObjectId, parameters);
         }
 
+        /// <summary>
+        /// Serialize a single parameter to binary
+        /// </summary>
         private static void SerializeParameter(BinaryWriter writer, object parameter)
         {
             if (parameter == null)
             {
-                writer.Write((byte)0); // Null marker
+                writer.Write((byte)0);
                 return;
             }
 
@@ -97,7 +103,6 @@ namespace RogueLike.Netcode
             }
             else
             {
-                // Fallback to JSON for complex types
                 writer.Write((byte)255);
                 writer.Write(type.AssemblyQualifiedName!);
                 var json = JsonSerializer.Serialize(parameter);
@@ -105,14 +110,17 @@ namespace RogueLike.Netcode
             }
         }
 
+        /// <summary>
+        /// Deserialize a single parameter from binary
+        /// </summary>
         private static object DeserializeParameter(BinaryReader reader)
         {
             var typeId = reader.ReadByte();
 
-            if (typeId == 0) // Null marker
+            if (typeId == 0)
                 return null!;
 
-            if (typeId == 255) // JSON fallback
+            if (typeId == 255)
             {
                 var typeName = reader.ReadString();
                 var json = reader.ReadString();
@@ -130,6 +138,9 @@ namespace RogueLike.Netcode
             throw new InvalidOperationException($"Unknown type ID: {typeId}");
         }
 
+        /// <summary>
+        /// Write a value of a specific type to binary
+        /// </summary>
         private static void WriteValue(BinaryWriter writer, object value, Type type)
         {
             switch (Type.GetTypeCode(type))

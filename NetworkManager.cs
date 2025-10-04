@@ -27,13 +27,14 @@ namespace RogueLike.Netcode
             SetupTransportEvents();
         }
 
+        /// <summary>
+        /// Setup transport event handlers
+        /// </summary>
         private void SetupTransportEvents()
         {
             transport.OnClientConnected += (clientId) =>
             {
                 OnClientConnected?.Invoke(clientId);
-
-                // Sync existing network objects to the new client
                 SyncNetworkObjectsToClient(clientId);
             };
 
@@ -44,7 +45,7 @@ namespace RogueLike.Netcode
 
             transport.OnConnectedToServer += () =>
             {
-                LocalClientId = 1; // Client always gets ID 1
+                LocalClientId = 1;
                 OnConnectedToServer?.Invoke();
             };
 
@@ -63,7 +64,7 @@ namespace RogueLike.Netcode
         {
             if (transport.StartServer(port, maxClients))
             {
-                LocalClientId = 0; // Server is always client ID 0
+                LocalClientId = 0;
                 isInitialized = true;
                 NetworkBehaviour.Initialize(this);
                 return true;
@@ -103,14 +104,12 @@ namespace RogueLike.Netcode
         {
             try
             {
-                // Check if it's a spawn message first
                 if (NetworkObjectSpawner.IsSpawnMessage(data))
                 {
                     NetworkObjectSpawner.HandleSpawnMessage(data);
                     return;
                 }
 
-                // Otherwise, handle as RPC
                 var (methodName, networkObjectId, parameters) = RpcSerializer.DeserializeRpcCall(data);
                 NetworkBehaviour.ExecuteRpc(networkObjectId, methodName, parameters, senderId);
             }
@@ -143,26 +142,17 @@ namespace RogueLike.Netcode
         {
             transport.SendToServer(data, deliveryMode);
         }
-
-
         /// <summary>
         /// Spawn a network object of type T on all clients (server only)
-        /// This creates a proper proxy instance locally and sends spawn message to clients
         /// </summary>
         public T SpawnNetworkObject<T>() where T : NetworkBehaviour, new()
         {
             if (!IsHost)
                 throw new InvalidOperationException("Only the server can spawn network objects");
 
-            // Create proxy instance locally (like the spawner does)
             var networkObject = NetworkBehaviour.CreateProxy<T>();
-
-            // Set network properties locally
             networkObject.SetNetworkProperties(networkObject.NetworkObjectId, LocalClientId);
 
-            Console.WriteLine($"Server spawning network object: {typeof(T).Name} (ID: {networkObject.NetworkObjectId})");
-
-            // Send spawn message to all clients
             var spawnData = NetworkObjectSpawner.SerializeSpawnObject(networkObject);
             SendToAllClients(spawnData, DeliveryMode.Reliable);
 

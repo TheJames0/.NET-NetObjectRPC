@@ -35,8 +35,6 @@ namespace RogueLike.Netcode
         /// </summary>
         protected static NetworkManager? NetworkManager { get; set; }
 
-
-        //-------------- Interception and RPC injection --------------
         private static readonly ProxyGenerator _proxyGenerator = new ProxyGenerator();
         private static readonly RpcInterceptor _rpcInterceptor = new RpcInterceptor();
 
@@ -52,8 +50,6 @@ namespace RogueLike.Netcode
         {
             NetworkObjectId = nextNetworkId++;
             NetworkObjects[NetworkObjectId] = this;
-
-            // Cache RPC methods for this type
             CacheRpcMethods();
         }
 
@@ -62,7 +58,6 @@ namespace RogueLike.Netcode
         /// </summary>
         internal void SetNetworkProperties(uint networkObjectId, uint ownerClientId)
         {
-            // Remove from old ID if it exists
             if (NetworkObjects.ContainsKey(NetworkObjectId))
                 NetworkObjects.Remove(NetworkObjectId);
 
@@ -70,17 +65,14 @@ namespace RogueLike.Netcode
             OwnerClientId = ownerClientId;
             NetworkObjects[NetworkObjectId] = this;
 
-            // Call the virtual spawn method for custom spawn logic
             OnNetworkSpawn();
         }
 
         /// <summary>
-        /// Called when this object is spawned over the network.
-        /// Override this method to implement custom spawn behavior.
+        /// Called when this object is spawned over the network
         /// </summary>
         public virtual void OnNetworkSpawn()
         {
-            // Default implementation - can be overridden by derived classes
         }
 
         /// <summary>
@@ -110,7 +102,6 @@ namespace RogueLike.Netcode
 
                 if (clientRpcAttr != null || serverRpcAttr != null)
                 {
-                    // Validate that RPC methods are virtual
                     if (!method.IsVirtual || method.IsFinal)
                     {
                         throw new InvalidOperationException(
@@ -138,28 +129,25 @@ namespace RogueLike.Netcode
                 !methods.TryGetValue(methodName, out var method))
                 return false;
 
-            // Check if this is a server RPC and validate ownership if required
             var serverRpcAttr = method.GetCustomAttribute<ServerRpcAttribute>();
             if (serverRpcAttr != null)
             {
                 if (NetworkManager?.IsHost != true)
-                    return false; // Server RPCs can only be executed on the server
+                    return false;
 
                 if (serverRpcAttr.RequireOwnership && networkObject.OwnerClientId != senderId)
-                    return false; // Ownership check failed
+                    return false;
             }
 
-            // Check if this is a client RPC
             var clientRpcAttr = method.GetCustomAttribute<ClientRpcAttribute>();
             if (clientRpcAttr != null)
             {
                 if (NetworkManager?.IsClient != true)
-                    return false; // Client RPCs can only be executed on clients
+                    return false;
             }
 
             try
             {
-                // Convert parameters to match method signature
                 var methodParams = method.GetParameters();
                 var convertedParams = new object[methodParams.Length];
 
@@ -183,7 +171,6 @@ namespace RogueLike.Netcode
         /// </summary>
         protected void InvokeClientRpc(string methodName, params object[] parameters)
         {
-
             if (NetworkManager?.IsHost != true)
                 return;
 
@@ -192,7 +179,6 @@ namespace RogueLike.Netcode
             if (clientRpcAttr == null)
                 return;
 
-            // Check ownership if required
             if (clientRpcAttr.RequireOwnership && NetworkManager.LocalClientId != OwnerClientId)
                 return;
 
@@ -213,7 +199,6 @@ namespace RogueLike.Netcode
             if (clientRpcAttr == null)
                 return;
 
-            // Check ownership if required
             if (clientRpcAttr.RequireOwnership && NetworkManager.LocalClientId != OwnerClientId)
                 return;
 
@@ -226,60 +211,36 @@ namespace RogueLike.Netcode
         /// </summary>
         protected void InvokeServerRpc(string methodName, params object[] parameters)
         {
-            Console.WriteLine($"InvokeServerRpc called for method: {methodName}");
-            Console.WriteLine($"NetworkManager IsClient: {NetworkManager?.IsClient}, IsConnected: {NetworkManager?.IsConnected}");
-
             if (NetworkManager?.IsClient != true)
-            {
-                Console.WriteLine("Cannot send ServerRpc - NetworkManager is not a client or is null");
                 return;
-            }
 
             var method = GetRpcMethod(methodName);
             var serverRpcAttr = method?.GetCustomAttribute<ServerRpcAttribute>();
             if (serverRpcAttr == null)
-            {
-                Console.WriteLine($"Method {methodName} does not have ServerRpc attribute");
                 return;
-            }
 
-            // Check ownership if required
             if (serverRpcAttr.RequireOwnership && NetworkManager.LocalClientId != OwnerClientId)
-            {
-                Console.WriteLine($"Ownership check failed - LocalClientId: {NetworkManager.LocalClientId}, OwnerClientId: {OwnerClientId}");
                 return;
-            }
 
-            Console.WriteLine($"Serializing and sending ServerRpc {methodName} to server...");
             var data = RpcSerializer.SerializeRpcCall(methodName, NetworkObjectId, parameters);
             NetworkManager.SendToServer(data, serverRpcAttr.DeliveryMode);
-            Console.WriteLine($"ServerRpc {methodName} sent successfully");
         }
 
         /// <summary>
         /// Intercept and automatically handle RPC method calls
-        /// Call this method at the beginning of any method that should be handled as RPC
         /// </summary>
         public bool InterceptRpc(object[] parameters, [CallerMemberName] string methodName = "")
         {
             if (string.IsNullOrEmpty(methodName))
                 return false;
 
-            Console.WriteLine($"InterceptRpc called for method: {methodName}");
-            Console.WriteLine($"NetworkManager state - IsHost: {NetworkManager?.IsHost}, IsClient: {NetworkManager?.IsClient}, IsConnected: {NetworkManager?.IsConnected}");
-
-            // Check cache first
             if (methodInterceptionCache.TryGetValue(methodName, out var isRpcCached))
             {
                 if (!isRpcCached)
-                {
-                    Console.WriteLine($"Method {methodName} is not an RPC (cached)");
                     return false;
-                }
             }
             else
             {
-                // Check if this method has RPC attributes
                 var method = GetRpcMethod(methodName);
                 var isRpc = method != null &&
                           (method.GetCustomAttribute<ServerRpcAttribute>() != null ||
@@ -288,67 +249,45 @@ namespace RogueLike.Netcode
                 methodInterceptionCache[methodName] = isRpc;
 
                 if (!isRpc)
-                {
-                    Console.WriteLine($"Method {methodName} is not an RPC");
                     return false;
-                }
             }
 
             var rpcMethod = GetRpcMethod(methodName);
             if (rpcMethod == null)
-            {
-                Console.WriteLine($"Could not find RPC method: {methodName}");
                 return false;
-            }
 
-            // Handle ServerRpc
             var serverRpcAttr = rpcMethod.GetCustomAttribute<ServerRpcAttribute>();
             if (serverRpcAttr != null)
             {
-                Console.WriteLine($"Method {methodName} is a ServerRpc");
-
-                // If we're on the server, execute locally
                 if (NetworkManager?.IsHost == true)
                 {
-                    Console.WriteLine("Executing ServerRpc locally on server/host");
-                    return false; // Let the method execute normally on server
+                    return false;
                 }
-                // If we're a client, send to server
                 else if (NetworkManager?.IsClient == true)
                 {
-                    Console.WriteLine("Sending ServerRpc from client to server");
                     InvokeServerRpc(methodName, parameters);
-                    return true; // Intercept - don't execute locally
+                    return true;
                 }
                 else
                 {
-                    Console.WriteLine("NetworkManager is null or not connected - cannot send ServerRpc");
                     return false;
                 }
             }
 
-            // Handle ClientRpc  
             var clientRpcAttr = rpcMethod.GetCustomAttribute<ClientRpcAttribute>();
             if (clientRpcAttr != null)
             {
-                Console.WriteLine($"Method {methodName} is a ClientRpc");
-
-                // If we're on the server, send to all clients
                 if (NetworkManager?.IsHost == true)
                 {
-                    Console.WriteLine("Sending ClientRpc from server to all clients");
                     InvokeClientRpc(methodName, parameters);
-                    return false; // Also execute locally on server
+                    return false;
                 }
-                // If we're a client, this was called remotely, execute normally
                 else if (NetworkManager?.IsClient == true)
                 {
-                    Console.WriteLine("Executing ClientRpc locally on client");
-                    return false; // Execute locally on client
+                    return false;
                 }
             }
 
-            Console.WriteLine($"No valid network state for method {methodName}");
             return false;
         }
 

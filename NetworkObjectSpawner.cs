@@ -10,7 +10,7 @@ namespace RogueLike.Netcode
     /// </summary>
     public static class NetworkObjectSpawner
     {
-        private const byte SPAWN_OBJECT_MESSAGE = 255; // Special message type for spawning
+        private const byte SPAWN_OBJECT_MESSAGE = 255;
 
         /// <summary>
         /// Serialize a network object spawn message
@@ -20,13 +20,10 @@ namespace RogueLike.Netcode
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);
 
-            // Write message type
             writer.Write(SPAWN_OBJECT_MESSAGE);
 
-            // Write object type name - get the base type if it's a proxy
             var objectType = networkObject.GetType();
 
-            // If it's a Castle proxy, get the base type
             if (objectType.FullName?.StartsWith("Castle.Proxies.") == true)
             {
                 objectType = objectType.BaseType ?? objectType;
@@ -35,10 +32,7 @@ namespace RogueLike.Netcode
             var typeName = objectType.FullName ?? objectType.Name;
             writer.Write(typeName);
 
-            // Write network object ID
             writer.Write(networkObject.NetworkObjectId);
-
-            // Write owner client ID
             writer.Write(networkObject.OwnerClientId);
 
             return stream.ToArray();
@@ -54,21 +48,14 @@ namespace RogueLike.Netcode
                 using var stream = new MemoryStream(data);
                 using var reader = new BinaryReader(stream);
 
-                // Read message type
                 var messageType = reader.ReadByte();
                 if (messageType != SPAWN_OBJECT_MESSAGE)
                     return false;
 
-                // Read object type name
                 var typeName = reader.ReadString();
-
-                // Read network object ID
                 var networkObjectId = reader.ReadUInt32();
-
-                // Read owner client ID
                 var ownerClientId = reader.ReadUInt32();
 
-                // Try to create the object
                 var objectType = Type.GetType(typeName);
                 if (objectType == null)
                 {
@@ -76,7 +63,6 @@ namespace RogueLike.Netcode
                     return false;
                 }
 
-                // Use reflection to call NetworkBehaviour.CreateProxy<T>()
                 var createProxyMethod = typeof(NetworkBehaviour).GetMethod("CreateProxy", BindingFlags.Public | BindingFlags.Static);
                 if (createProxyMethod == null)
                 {
@@ -93,10 +79,7 @@ namespace RogueLike.Netcode
                     return false;
                 }
 
-                // Set the properties from the network
                 networkObject.SetNetworkProperties(networkObjectId, ownerClientId);
-
-                Console.WriteLine($"Spawned network object: {typeName} (ID: {networkObjectId}, Owner: {ownerClientId})");
                 return true;
             }
             catch (Exception ex)
