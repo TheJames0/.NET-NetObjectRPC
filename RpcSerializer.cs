@@ -25,8 +25,8 @@ namespace RogueLike.Netcode
             { typeof(float), 10 },
             { typeof(double), 11 },
             { typeof(string), 12 },
-            { typeof(Vector2), 13 },
-            { typeof(Vector3), 14 }
+            { typeof(System.Numerics.Vector2), 13 },
+            { typeof(System.Numerics.Vector3), 14 }
         };
 
         private static readonly Dictionary<byte, Type> IdToType = new();
@@ -182,15 +182,15 @@ namespace RogueLike.Netcode
                     writer.Write((string)value);
                     break;
                 default:
-                    if (type == typeof(Vector2))
+                    if (type == typeof(System.Numerics.Vector2))
                     {
-                        var v = (Vector2)value;
+                        var v = (System.Numerics.Vector2)value;
                         writer.Write(v.X);
                         writer.Write(v.Y);
                     }
-                    else if (type == typeof(Vector3))
+                    else if (type == typeof(System.Numerics.Vector3))
                     {
-                        var v = (Vector3)value;
+                        var v = (System.Numerics.Vector3)value;
                         writer.Write(v.X);
                         writer.Write(v.Y);
                         writer.Write(v.Z);
@@ -228,13 +228,13 @@ namespace RogueLike.Netcode
                 case TypeCode.String:
                     return reader.ReadString();
                 default:
-                    if (type == typeof(Vector2))
+                    if (type == typeof(System.Numerics.Vector2))
                     {
-                        return new Vector2(reader.ReadSingle(), reader.ReadSingle());
+                        return new System.Numerics.Vector2(reader.ReadSingle(), reader.ReadSingle());
                     }
-                    else if (type == typeof(Vector3))
+                    else if (type == typeof(System.Numerics.Vector3))
                     {
-                        return new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                        return new System.Numerics.Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     }
                     break;
             }

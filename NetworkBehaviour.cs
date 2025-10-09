@@ -12,6 +12,7 @@ namespace RogueLike.Netcode
     /// </summary>
     public abstract class NetworkBehaviour
     {
+        public uint LocalClientId => NetworkManager?.LocalClientId ?? 0;
         private static uint nextNetworkId = 1;
         private static readonly Dictionary<uint, NetworkBehaviour> NetworkObjects = new();
         private static readonly Dictionary<Type, Dictionary<string, MethodInfo>> CachedRpcMethods = new();

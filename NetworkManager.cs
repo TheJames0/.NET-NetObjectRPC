@@ -151,7 +151,21 @@ namespace RogueLike.Netcode
                 throw new InvalidOperationException("Only the server can spawn network objects");
 
             var networkObject = NetworkBehaviour.CreateProxy<T>();
-            networkObject.SetNetworkProperties(networkObject.NetworkObjectId, LocalClientId);
+            networkObject.SetNetworkProperties(networkObject.NetworkObjectId, 0);
+
+            var spawnData = NetworkObjectSpawner.SerializeSpawnObject(networkObject);
+            SendToAllClients(spawnData, DeliveryMode.Reliable);
+
+            return networkObject;
+        }
+
+        public T SpawnNetworkObject<T>(uint ownerClientId) where T : NetworkBehaviour, new()
+        {
+            if (!IsHost)
+                throw new InvalidOperationException("Only the server can spawn network objects");
+
+            var networkObject = NetworkBehaviour.CreateProxy<T>();
+            networkObject.SetNetworkProperties(networkObject.NetworkObjectId, ownerClientId);
 
             var spawnData = NetworkObjectSpawner.SerializeSpawnObject(networkObject);
             SendToAllClients(spawnData, DeliveryMode.Reliable);
