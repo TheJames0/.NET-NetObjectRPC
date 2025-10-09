@@ -1,14 +1,22 @@
-A WIP lightweight networking library with similar syntax to Unity's NGO for C# .NET that provides a simple network object registry and simple RPC functionality driven by c# attributes.
+A WIP lightweight networking library with similar syntax to Unity's NGO for C# .NET that provides a simple network object registry and simple RPC functionality.
 
 ## Dependencies
 
 - **Castle.Core** (≥5.0.0) - Method interception
-- **ENet-CSharp** (≥2.4.8) - UDP networking
+- **LiteNetLib** (≥1.3.1) - UDP networking
 - **.NET 6.0+**
 
 ## Quick Start
+### 1. Import
 
-### 1. Create a Networked Class
+Add a project reference in your `.csproj` file:
+
+```xml
+<ItemGroup>
+    <ProjectReference Include="Netcode\Netcode.csproj" />
+</ItemGroup>
+```
+### 2. Create a Networked Class
 ```csharp
 public class Player : NetworkBehaviour
 {
@@ -20,7 +28,7 @@ public class Player : NetworkBehaviour
 }
 ```
 
-### 2. Setup Network Manager
+### 3. Setup Network Manager
 ```csharp
 var networkManager = new NetworkManager();
 
@@ -38,7 +46,7 @@ while (true)
 }
 ```
 
-### 3. Use RPCs
+### 4. Use RPCs
 ```csharp
 // Spawn object
 var player = networkManager.SpawnNetworkObject<Player>();
