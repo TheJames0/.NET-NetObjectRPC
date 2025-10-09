@@ -1,4 +1,4 @@
-A WIP lightweight networking library with similar syntax to Unity's NGO for C# .NET that provides a simple network object registry and simple RPC functionality.
+A WIP lightweight networking library with similar syntax to Unity's NGO for C# .NET that provides a simple network object registry and simple RPC functionality driven by c# attributes.
 
 ## Dependencies
 
