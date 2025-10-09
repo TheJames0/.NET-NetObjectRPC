@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using ENet;
+using LiteNetLib;
+using LiteNetLib.Utils;
 
 namespace RogueLike.Netcode
 {
@@ -11,10 +12,10 @@ namespace RogueLike.Netcode
     public class NetworkClient
     {
         public uint ClientId { get; }
-        public Peer Peer { get; }
+        public NetPeer? Peer { get; }
         public bool IsConnected { get; set; }
 
-        public NetworkClient(uint clientId, Peer peer)
+        public NetworkClient(uint clientId, NetPeer? peer = null)
         {
             ClientId = clientId;
             Peer = peer;
@@ -23,13 +24,13 @@ namespace RogueLike.Netcode
     }
 
     /// <summary>
-    /// Network transport layer using ENet
+    /// Network transport layer using LiteNetLib
     /// </summary>
-    public class NetworkTransport : IDisposable
+    public class NetworkTransport : IDisposable, INetEventListener
     {
-        private Host? host;
+        private NetManager? netManager;
         private readonly Dictionary<uint, NetworkClient> clients = new();
-        private readonly Dictionary<uint, uint> peerIdToClientId = new(); // Map peer ID to client ID
+        private readonly Dictionary<int, uint> peerIdToClientId = new(); // Map peer ID to client ID
         private uint nextClientId = 1;
         private bool isServer;
         private bool isClient;
@@ -43,7 +44,8 @@ namespace RogueLike.Netcode
 
         public bool IsHost => isServer;
         public bool IsClient => isClient;
-        public bool IsConnected => (isServer && host != null) || (isClient && serverConnection?.IsConnected == true);
+        public bool IsConnected => (isServer && netManager != null && netManager.IsRunning) ||
+                                  (isClient && serverConnection?.IsConnected == true);
 
         public IReadOnlyDictionary<uint, NetworkClient> ConnectedClients => clients;
 
@@ -52,28 +54,28 @@ namespace RogueLike.Netcode
         /// </summary>
         public bool StartServer(int port, int maxClients = 32)
         {
-            if (host != null)
+            if (netManager != null)
                 return false;
 
             try
             {
-                Library.Initialize();
-
-                var address = new Address
+                netManager = new NetManager(this)
                 {
-                    Port = (ushort)port
+                    BroadcastReceiveEnabled = true,
+                    UnconnectedMessagesEnabled = true
                 };
 
-                host = new Host();
-                host.Create(address, maxClients);
-
-                isServer = true;
-                return true;
+                bool started = netManager.Start(port);
+                if (started)
+                {
+                    isServer = true;
+                }
+                return started;
             }
             catch
             {
-                host?.Dispose();
-                host = null;
+                netManager?.Stop();
+                netManager = null;
                 return false;
             }
         }
@@ -83,30 +85,27 @@ namespace RogueLike.Netcode
         /// </summary>
         public bool StartClient(string serverAddress, int port)
         {
-            if (host != null)
+            if (netManager != null)
                 return false;
 
             try
             {
-                Library.Initialize();
+                netManager = new NetManager(this);
+                netManager.Start();
 
-                host = new Host();
-                host.Create();
-
-                var address = new Address();
-                address.SetHost(serverAddress);
-                address.Port = (ushort)port;
-
-                var peer = host.Connect(address);
-                serverConnection = new NetworkClient(0, peer); // Server is always ID 0
-
-                isClient = true;
-                return true;
+                var peer = netManager.Connect(serverAddress, port, "");
+                if (peer != null)
+                {
+                    serverConnection = new NetworkClient(0, peer); // Server is always ID 0
+                    isClient = true;
+                    return true;
+                }
+                return false;
             }
             catch
             {
-                host?.Dispose();
-                host = null;
+                netManager?.Stop();
+                netManager = null;
                 return false;
             }
         }
@@ -116,69 +115,44 @@ namespace RogueLike.Netcode
         /// </summary>
         public void Update()
         {
-            if (host == null)
-                return;
-
-            bool polled = false;
-            while (!polled)
-            {
-                if (host.CheckEvents(out Event networkEvent) <= 0)
-                {
-                    if (host.Service(0, out networkEvent) <= 0)
-                        break;
-                    polled = true;
-                }
-
-                ProcessEvent(networkEvent);
-            }
+            netManager?.PollEvents();
         }
 
-        private void ProcessEvent(Event networkEvent)
-        {
-            switch (networkEvent.Type)
-            {
-                case EventType.Connect:
-                    HandleConnect(networkEvent);
-                    break;
-                case EventType.Disconnect:
-                    HandleDisconnect(networkEvent);
-                    break;
-                case EventType.Receive:
-                    HandleReceive(networkEvent);
-                    break;
-            }
-        }
-
-        private void HandleConnect(Event networkEvent)
+        // INetEventListener implementation
+        public void OnPeerConnected(NetPeer peer)
         {
             if (isServer)
             {
                 var clientId = nextClientId++;
-                var client = new NetworkClient(clientId, networkEvent.Peer);
+                var client = new NetworkClient(clientId, peer);
                 clients[clientId] = client;
 
                 // Map peer ID to client ID
-                peerIdToClientId[networkEvent.Peer.ID] = clientId;
+                peerIdToClientId[peer.Id] = clientId;
 
                 OnClientConnected?.Invoke(clientId);
             }
             else if (isClient)
             {
+                if (serverConnection != null)
+                {
+                    serverConnection.IsConnected = true;
+                }
                 OnConnectedToServer?.Invoke();
             }
         }
 
-        private void HandleDisconnect(Event networkEvent)
+        public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
             if (isServer)
             {
-                if (peerIdToClientId.TryGetValue(networkEvent.Peer.ID, out var clientId))
+                if (peerIdToClientId.TryGetValue(peer.Id, out var clientId))
                 {
                     if (clients.TryGetValue(clientId, out var client))
                     {
                         client.IsConnected = false;
                         clients.Remove(clientId);
-                        peerIdToClientId.Remove(networkEvent.Peer.ID);
+                        peerIdToClientId.Remove(peer.Id);
                         OnClientDisconnected?.Invoke(clientId);
                     }
                 }
@@ -193,22 +167,43 @@ namespace RogueLike.Netcode
             }
         }
 
-        private void HandleReceive(Event networkEvent)
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
-            var packet = networkEvent.Packet;
-            var dataLength = (int)packet.Length;
+            var dataLength = reader.AvailableBytes;
             var data = new byte[dataLength];
-
-            // Copy packet data
-            var packetData = packet.Data;
-            System.Runtime.InteropServices.Marshal.Copy(packetData, data, 0, dataLength);
+            reader.GetBytes(data, dataLength);
 
             var senderId = isServer ?
-                (peerIdToClientId.TryGetValue(networkEvent.Peer.ID, out var id) ? id : 0) : 0;
+                (peerIdToClientId.TryGetValue(peer.Id, out var id) ? id : 0) : 0;
 
             OnDataReceived?.Invoke(data, senderId);
+        }
 
-            packet.Dispose();
+        public void OnNetworkError(IPEndPoint endPoint, System.Net.Sockets.SocketError socketError)
+        {
+            // Handle network errors if needed
+        }
+
+        public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+        {
+            // Handle latency updates if needed
+        }
+
+        public void OnConnectionRequest(ConnectionRequest request)
+        {
+            if (isServer)
+            {
+                request.Accept();
+            }
+            else
+            {
+                request.Reject();
+            }
+        }
+
+        public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+        {
+            // Handle unconnected messages if needed
         }
 
         /// <summary>
@@ -216,14 +211,12 @@ namespace RogueLike.Netcode
         /// </summary>
         public void SendToClient(uint clientId, byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable)
         {
-            if (!isServer || host == null)
+            if (!isServer || netManager == null)
                 return;
 
-            if (clients.TryGetValue(clientId, out var client) && client.IsConnected)
+            if (clients.TryGetValue(clientId, out var client) && client.IsConnected && client.Peer != null)
             {
-                var packet = default(Packet);
-                packet.Create(data, GetPacketFlags(deliveryMode));
-                client.Peer.Send(0, ref packet);
+                client.Peer.Send(data, GetDeliveryMethod(deliveryMode));
             }
         }
 
@@ -232,17 +225,15 @@ namespace RogueLike.Netcode
         /// </summary>
         public void SendToAllClients(byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable)
         {
-            if (!isServer || host == null)
+            if (!isServer || netManager == null)
                 return;
 
-            var packet = default(Packet);
-            packet.Create(data, GetPacketFlags(deliveryMode));
-
+            var deliveryMethod = GetDeliveryMethod(deliveryMode);
             foreach (var client in clients.Values)
             {
-                if (client.IsConnected)
+                if (client.IsConnected && client.Peer != null)
                 {
-                    client.Peer.Send(0, ref packet);
+                    client.Peer.Send(data, deliveryMethod);
                 }
             }
         }
@@ -252,22 +243,20 @@ namespace RogueLike.Netcode
         /// </summary>
         public void SendToServer(byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable)
         {
-            if (!isClient || host == null || serverConnection?.IsConnected != true)
+            if (!isClient || netManager == null || serverConnection?.IsConnected != true || serverConnection.Peer == null)
                 return;
 
-            var packet = default(Packet);
-            packet.Create(data, GetPacketFlags(deliveryMode));
-            serverConnection.Peer.Send(0, ref packet);
+            serverConnection.Peer.Send(data, GetDeliveryMethod(deliveryMode));
         }
 
-        private static PacketFlags GetPacketFlags(DeliveryMode deliveryMode)
+        private static DeliveryMethod GetDeliveryMethod(DeliveryMode deliveryMode)
         {
             return deliveryMode switch
             {
-                DeliveryMode.Reliable => PacketFlags.Reliable,
-                DeliveryMode.Unreliable => PacketFlags.None,
-                DeliveryMode.UnreliableSequenced => PacketFlags.Unsequenced,
-                _ => PacketFlags.Reliable
+                DeliveryMode.Reliable => DeliveryMethod.ReliableOrdered,
+                DeliveryMode.Unreliable => DeliveryMethod.Unreliable,
+                DeliveryMode.UnreliableSequenced => DeliveryMethod.Sequenced,
+                _ => DeliveryMethod.ReliableOrdered
             };
         }
 
@@ -276,27 +265,26 @@ namespace RogueLike.Netcode
         /// </summary>
         public void Stop()
         {
-            if (host != null)
+            if (netManager != null)
             {
                 if (isServer)
                 {
                     // Disconnect all clients
                     foreach (var client in clients.Values)
                     {
-                        if (client.IsConnected)
+                        if (client.IsConnected && client.Peer != null)
                         {
-                            client.Peer.DisconnectNow(0);
+                            client.Peer.Disconnect();
                         }
                     }
                 }
-                else if (isClient && serverConnection?.IsConnected == true)
+                else if (isClient && serverConnection?.IsConnected == true && serverConnection.Peer != null)
                 {
-                    serverConnection.Peer.DisconnectNow(0);
+                    serverConnection.Peer.Disconnect();
                 }
 
-                host.Flush();
-                host.Dispose();
-                host = null;
+                netManager.Stop();
+                netManager = null;
             }
 
             clients.Clear();
@@ -304,8 +292,6 @@ namespace RogueLike.Netcode
             serverConnection = null;
             isServer = false;
             isClient = false;
-
-            Library.Deinitialize();
         }
 
         public void Dispose()
