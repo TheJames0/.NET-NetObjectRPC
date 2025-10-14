@@ -83,7 +83,7 @@ namespace RogueLike.Netcode
         /// <summary>
         /// Start as client and connect to server
         /// </summary>
-        public bool StartClient(string serverAddress, int port)
+        public bool StartClient(IHostIdentifier serverAddress, int port)
         {
             if (netManager != null)
                 return false;
@@ -93,7 +93,9 @@ namespace RogueLike.Netcode
                 netManager = new NetManager(this);
                 netManager.Start();
 
-                var peer = netManager.Connect(serverAddress, port, "");
+                // Assume IHostIdentifier has an Address property or method
+                string address = (serverAddress as DefaultHostIdentifier)?.Address ?? serverAddress.ToString();
+                var peer = netManager.Connect(address, port, "");
                 if (peer != null)
                 {
                     serverConnection = new NetworkClient(0, peer); // Server is always ID 0

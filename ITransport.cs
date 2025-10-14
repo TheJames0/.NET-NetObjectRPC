@@ -17,7 +17,7 @@ namespace RogueLike.Netcode
         IReadOnlyDictionary<uint, INetworkClient> ConnectedClients { get; }
 
         bool StartServer(int port, int maxClients = 32);
-        bool StartClient(string serverAddress, int port);
+        bool StartClient(IHostIdentifier serverAddress, int port);
         void Update();
         void SendToClient(uint clientId, byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable);
         void SendToAllClients(byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable);

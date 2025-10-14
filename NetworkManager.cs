@@ -78,9 +78,9 @@ namespace RogueLike.Netcode
         /// <summary>
         /// Start as client and connect to server
         /// </summary>
-        public bool StartClient(string serverAddress, int port)
+        public bool StartClient(IHostIdentifier hostIdentifier, int port)
         {
-            if (transport.StartClient(serverAddress, port))
+            if (transport.StartClient(hostIdentifier, port))
             {
                 isInitialized = true;
                 NetworkBehaviour.Initialize(this);
