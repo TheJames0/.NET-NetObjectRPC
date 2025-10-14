@@ -121,6 +121,12 @@ namespace RogueLike.Netcode
                     return;
                 }
 
+                // Ignore connection trigger message
+                if (data.Length == 1 && data[0] == 0x00)
+                {
+                    return;
+                }
+
                 if (NetworkObjectSpawner.IsSpawnMessage(data))
                 {
                     NetworkObjectSpawner.HandleSpawnMessage(data);
