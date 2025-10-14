@@ -130,6 +130,16 @@ namespace RogueLike.Netcode
                 if (NetworkObjectSpawner.IsSpawnMessage(data))
                 {
                     NetworkObjectSpawner.HandleSpawnMessage(data);
+                    if (IsHost)
+                    {
+                        foreach (var kvp in transport.ConnectedClients)
+                        {
+                            if (kvp.Key != senderId)
+                            {
+                                SendToClient(kvp.Key, data, DeliveryMode.Reliable);
+                            }
+                        }
+                    }
                     return;
                 }
 
@@ -191,7 +201,10 @@ namespace RogueLike.Netcode
             networkObject.SetNetworkProperties(networkObject.NetworkObjectId, ownerClientId);
 
             var spawnData = NetworkObjectSpawner.SerializeSpawnObject(networkObject);
-            SendToAllClients(spawnData, DeliveryMode.Reliable);
+            if (IsHost)
+                SendToAllClients(spawnData, DeliveryMode.Reliable);
+            else
+                SendToServer(spawnData, DeliveryMode.Reliable);
 
             return networkObject;
         }
