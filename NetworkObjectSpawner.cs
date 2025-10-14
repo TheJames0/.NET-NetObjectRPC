@@ -56,6 +56,10 @@ namespace RogueLike.Netcode
                 var networkObjectId = reader.ReadUInt32();
                 var ownerClientId = reader.ReadUInt32();
 
+                // Check if object already exists
+                if (NetworkBehaviour.GetNetworkObject(networkObjectId) != null)
+                    return true;
+
                 var objectType = Type.GetType(typeName);
                 if (objectType == null)
                 {

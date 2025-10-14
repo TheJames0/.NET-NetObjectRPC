@@ -161,6 +161,20 @@ namespace RogueLike.Netcode
         }
 
         /// <summary>
+        /// Send data to all connected clients except the local client
+        /// </summary>
+        private void SendToOtherClients(byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable)
+        {
+            foreach (var kvp in GetConnectedClients())
+            {
+                if (kvp.Key != LocalClientId)
+                {
+                    SendToClient(kvp.Key, data, deliveryMode);
+                }
+            }
+        }
+
+        /// <summary>
         /// Send data to all clients (server only)
         /// </summary>
         public void SendToAllClients(byte[] data, DeliveryMode deliveryMode = DeliveryMode.Reliable)
@@ -187,7 +201,7 @@ namespace RogueLike.Netcode
             networkObject.SetNetworkProperties(networkObject.NetworkObjectId, 0);
 
             var spawnData = NetworkObjectSpawner.SerializeSpawnObject(networkObject);
-            SendToAllClients(spawnData, DeliveryMode.Reliable);
+            SendToOtherClients(spawnData, DeliveryMode.Reliable);
 
             return networkObject;
         }
@@ -202,9 +216,13 @@ namespace RogueLike.Netcode
 
             var spawnData = NetworkObjectSpawner.SerializeSpawnObject(networkObject);
             if (IsHost)
-                SendToAllClients(spawnData, DeliveryMode.Reliable);
+            {
+                SendToOtherClients(spawnData, DeliveryMode.Reliable);
+            }
             else
+            {
                 SendToServer(spawnData, DeliveryMode.Reliable);
+            }
 
             return networkObject;
         }
