@@ -39,6 +39,11 @@ namespace RogueLike.Netcode
             {
                 OnClientConnected?.Invoke(clientId);
                 SyncNetworkObjectsToClient(clientId);
+                // Send assigned client ID to the newly connected client
+                var idMsg = new byte[5];
+                idMsg[0] = 0x01; // Message type: 1 = client ID assignment
+                BitConverter.GetBytes(clientId).CopyTo(idMsg, 1);
+                SendToClient(clientId, idMsg, DeliveryMode.Reliable);
             };
 
             transport.OnClientDisconnected += (clientId) =>
@@ -48,8 +53,7 @@ namespace RogueLike.Netcode
 
             transport.OnConnectedToServer += () =>
             {
-                LocalClientId = 1;
-                OnConnectedToServer?.Invoke();
+                // Wait for server to assign client ID
             };
 
             transport.OnDisconnectedFromServer += () =>
@@ -107,6 +111,16 @@ namespace RogueLike.Netcode
         {
             try
             {
+                // Check for client ID assignment message
+                if (data.Length == 5 && data[0] == 0x01)
+                {
+                    uint assignedId = BitConverter.ToUInt32(data, 1);
+                    LocalClientId = assignedId;
+                    Console.WriteLine($"Assigned LocalClientId: {LocalClientId}");
+                    OnConnectedToServer?.Invoke();
+                    return;
+                }
+
                 if (NetworkObjectSpawner.IsSpawnMessage(data))
                 {
                     NetworkObjectSpawner.HandleSpawnMessage(data);
