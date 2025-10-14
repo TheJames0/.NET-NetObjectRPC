@@ -8,7 +8,7 @@ namespace RogueLike.Netcode
     /// </summary>
     public class NetworkManager : IDisposable
     {
-        private NetworkTransport transport;
+        private INetworkTransport transport;
         private bool isInitialized;
 
         public bool IsHost => transport.IsHost;
@@ -21,9 +21,12 @@ namespace RogueLike.Netcode
         public event Action? OnConnectedToServer;
         public event Action? OnDisconnectedFromServer;
 
-        public NetworkManager()
+        public NetworkManager(INetworkTransport? customTransport)
         {
-            transport = new NetworkTransport();
+            if (customTransport == null)
+                transport = new NetworkTransport();
+            else
+                transport = customTransport;
             SetupTransportEvents();
         }
 
@@ -203,7 +206,7 @@ namespace RogueLike.Netcode
         /// <summary>
         /// Get all connected clients
         /// </summary>
-        public IReadOnlyDictionary<uint, NetworkClient> GetConnectedClients()
+        public IReadOnlyDictionary<uint, INetworkClient> GetConnectedClients()
         {
             return transport.ConnectedClients;
         }

@@ -9,7 +9,7 @@ namespace RogueLike.Netcode
     /// <summary>
     /// Represents a connected client
     /// </summary>
-    public class NetworkClient
+    public class NetworkClient : INetworkClient
     {
         public uint ClientId { get; }
         public NetPeer? Peer { get; }
@@ -26,7 +26,7 @@ namespace RogueLike.Netcode
     /// <summary>
     /// Network transport layer using LiteNetLib
     /// </summary>
-    public class NetworkTransport : IDisposable, INetEventListener
+    public class NetworkTransport : INetworkTransport, IDisposable, INetEventListener
     {
         private NetManager? netManager;
         private readonly Dictionary<uint, NetworkClient> clients = new();
@@ -47,7 +47,7 @@ namespace RogueLike.Netcode
         public bool IsConnected => (isServer && netManager != null && netManager.IsRunning) ||
                                   (isClient && serverConnection?.IsConnected == true);
 
-        public IReadOnlyDictionary<uint, NetworkClient> ConnectedClients => clients;
+        public IReadOnlyDictionary<uint, INetworkClient> ConnectedClients => (IReadOnlyDictionary<uint, INetworkClient>)clients;
 
         /// <summary>
         /// Start as server
