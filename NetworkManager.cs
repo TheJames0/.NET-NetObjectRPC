@@ -53,7 +53,7 @@ namespace RogueLike.Netcode
 
             transport.OnConnectedToServer += () =>
             {
-                // Wait for server to assign client ID
+                OnConnectedToServer?.Invoke();
             };
 
             transport.OnDisconnectedFromServer += () =>
@@ -179,7 +179,7 @@ namespace RogueLike.Netcode
         public T SpawnNetworkObject<T>(uint ownerClientId) where T : NetworkBehaviour, new()
         {
             if (!IsHost && ownerClientId != LocalClientId)
-                throw new InvalidOperationException("Only the server or the owning client can spawn network objects");
+                throw new InvalidOperationException($"Only the server or the owning client can spawn network objects. passed: {ownerClientId}, expected: {LocalClientId}");
 
             var networkObject = NetworkBehaviour.CreateProxy<T>();
             networkObject.SetNetworkProperties(networkObject.NetworkObjectId, ownerClientId);
