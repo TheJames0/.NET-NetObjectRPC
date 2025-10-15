@@ -2,7 +2,7 @@ using System;
 using Castle.DynamicProxy;
 using System.Reflection;
 
-namespace RogueLike.Netcode
+namespace Netcode
 {
     /// <summary>
     /// Attribute to mark methods that should be executed on all clients. Methods with this attribute MUST be declared as virtual

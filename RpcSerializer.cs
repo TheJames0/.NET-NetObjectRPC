@@ -4,7 +4,7 @@ using System.Reflection;
 using System.IO;
 using System.Text.Json;
 
-namespace RogueLike.Netcode
+namespace Netcode
 {
     /// <summary>
     /// Handles serialization and deserialization of RPC calls

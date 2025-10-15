@@ -1,9 +1,12 @@
-public class DefaultHostIdentifier : IHostIdentifier
+namespace Netcode
 {
-    public string Address { get; private set; }
-
-    public DefaultHostIdentifier(string address)
+    public class DefaultHostIdentifier : IHostIdentifier
     {
-        Address = address;
+        public string Address { get; private set; }
+
+        public DefaultHostIdentifier(string address)
+        {
+            Address = address;
+        }
     }
 }

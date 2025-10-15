@@ -1,4 +1,7 @@
-public interface INetworkClient
+namespace Netcode
 {
+    public interface INetworkClient
+    {
 
+    }
 }

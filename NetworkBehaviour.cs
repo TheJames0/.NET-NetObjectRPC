@@ -5,7 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Castle.DynamicProxy;
 
-namespace RogueLike.Netcode
+namespace Netcode
 {
     /// <summary>
     /// Base class for networked objects that can send and receive RPCs

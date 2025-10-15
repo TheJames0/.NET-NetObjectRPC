@@ -4,7 +4,7 @@ using System.Net;
 using LiteNetLib;
 using LiteNetLib.Utils;
 
-namespace RogueLike.Netcode
+namespace Netcode
 {
     /// <summary>
     /// Represents a connected client

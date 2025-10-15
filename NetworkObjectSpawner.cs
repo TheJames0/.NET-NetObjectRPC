@@ -3,7 +3,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 
-namespace RogueLike.Netcode
+namespace Netcode
 {
     /// <summary>
     /// Handles spawning and synchronizing network objects across clients

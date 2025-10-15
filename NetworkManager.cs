@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace RogueLike.Netcode
+namespace Netcode
 {
     /// <summary>
     /// Main network manager that handles all networking operations

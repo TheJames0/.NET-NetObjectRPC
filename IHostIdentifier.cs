@@ -1,4 +1,7 @@
-public interface IHostIdentifier
+namespace Netcode
 {
+    public interface IHostIdentifier
+    {
 
+    }
 }
